@@ -7,11 +7,13 @@
 #include <pthread.h>
 #define MAX_THREADS 8
 
-//#include <openssl/sha.h> // needs -lcrypto
+#include <openssl/sha.h> // needs -lcrypto
+/*
 #include <CommonCrypto/CommonDigest.h>
 #ifndef SHA_DIGEST_LENGTH
   #define SHA_DIGEST_LENGTH CC_SHA1_DIGEST_LENGTH
 #endif
+*/
 
 #define MAX_MESSAGE 17
 
@@ -21,7 +23,7 @@ unsigned char hexMessage[MAX_MESSAGE/2];
 bool dry_run = false;
 volatile bool found = false;
 int count=0;
-CC_SHA1_CTX gctx;
+SHA_CTX gctx;
 
 void setFromGitConfig(char *message) {
   FILE *fp;
@@ -77,7 +79,7 @@ char* getCommit() {
   int headlen = strlen(header);
   len += headlen+1;
 
-  char * commit = malloc(len+2);
+  char * commit = malloc(len+20);
   memcpy(commit, header, headlen);
   commit[headlen+1] = '\0';
   memcpy(commit+headlen+1, commitbuff, len);
@@ -257,9 +259,9 @@ void *Search(void* argsptr){
     spiral_pair(n, &da, &dc);
     alter(newCommit, authOffset, authDate+da, commOffset, commDate+dc);
 
-    CC_SHA1_CTX ctx = gctx;
-    CC_SHA1_Update(&ctx, newCommitPartial, commitLenParital);
-    CC_SHA1_Final(hash, &ctx);
+    SHA_CTX ctx = gctx;
+    SHA1_Update(&ctx, newCommitPartial, commitLenParital);
+    SHA1_Final(hash, &ctx);
 
     if (shacmp(hash)) {
       if (found) { return NULL; } //another thread beat us
@@ -274,9 +276,9 @@ int main(int argc, char *argv[]) {
   for(int i = 0; i < MAX_MESSAGE; i++) { message[i] = '\0'; }
   if (argc==2) {
     if (!strncmp(argv[1], "--dry-run", sizeof("--dry-run"))) { dry_run = true; }
-    else { strlcpy(message, argv[1], MAX_MESSAGE); }
+    else { strncpy(message, argv[1], MAX_MESSAGE); }
   } else if (argc==3) {
-    strlcpy(message, argv[1], MAX_MESSAGE);
+    strncpy(message, argv[1], MAX_MESSAGE);
     if (!strncmp(argv[2], "--dry-run", sizeof("--dry-run"))) { dry_run = true; }
     else { puts("incorrect arguments"); exit(1); }
   } else if (argc>3) {
@@ -314,8 +316,8 @@ int main(int argc, char *argv[]) {
   dateLen = strlen(dateStr);
 
   // precompute sha up to the changing part
-  CC_SHA1_Init(&gctx);
-  CC_SHA1_Update(&gctx, commit, authOffset);
+  SHA1_Init(&gctx);
+  SHA1_Update(&gctx, commit, authOffset);
 
   // printf("a: %d, o: %d, ad: %d, od: %d\n", authOffset, commOffset, authDate, commDate);
   // printf("args: %d, message: %s, dry: %d \n", argc, message, dry_run);
